@@ -8,32 +8,48 @@ for char in key_string:
     KEY_BYTES.append(byte_value)
 
 def pad(data: bytes) -> bytes:
-    # Sempre cria um bloco de padding, com cada byte informando quantos bytes de padding foram criados.
+    """
+    Padding PKCS#7 modificado:
+    - Calcula quantos bytes faltam para completar um bloco
+    - Adiciona bytes com o valor do tamanho do padding
+    """
     pad_len = BLOCK_SIZE - (len(data) % BLOCK_SIZE)
     return data + bytes([pad_len] * pad_len)
 
 def unpad(data: bytes) -> bytes:
-    # Le o ultimo byte (sempre criado pelo pad()) para obter o tamanho do padding e retorna os dados sem o padding.
+    """
+    Remove padding PKCS#7:
+    - Lê o último byte para saber quantos bytes de padding remover
+    - Retorna os dados sem o padding
+    """
     return data[:-data[-1]]
 
 def vigenere(block: bytes, encrypt: bool = True) -> bytes:
+    """
+    Cifra de Vigenère modificada para bytes:
+    - Criptografia: byte + chave (mod 256)
+    - Descriptografia: byte - chave (mod 256)
+    """
     if encrypt:
-        op = 1
+        op = 1  # Adição para criptografia
     else:
-        op = -1
+        op = -1  # Subtração para descriptografia
     
     result = []
     for i in range(len(block)):
-        b = block[i]
-        k = KEY_BYTES[i]
-        new_byte = (b + op * k) % 256
+        b = block[i]  # Byte do bloco
+        k = KEY_BYTES[i]  # Byte da chave
+        new_byte = (b + op * k) % 256  # Operação modular
         result.append(new_byte)
     
     return bytes(result)
 
 def ecb(data: bytes, encrypt: bool = True) -> bytes:
+    """
+    Modo ECB (Electronic Codebook) - cada bloco é criptografado independentemente
+    """
     if encrypt:
-        # Criptografia
+        # Criptografia: adiciona padding e processa cada bloco independentemente
         data = pad(data)
         
         result = b''
@@ -43,7 +59,7 @@ def ecb(data: bytes, encrypt: bool = True) -> bytes:
             encrypted_block = vigenere(block, True)
             result = result + encrypted_block
     else:
-        # Descriptografia
+        # Descriptografia: processa cada bloco e remove padding
         result = b''
         for i in range(0, len(data), BLOCK_SIZE):
             # Aplica a descriptografia de vigenere no bloco e concatena ao resultado
@@ -56,40 +72,71 @@ def ecb(data: bytes, encrypt: bool = True) -> bytes:
     return result
 
 def cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
+    """
+    Modo CFB (Cipher Feedback) - usa feedback do ciphertext para criptografar próximo bloco
+    """
     if encrypt:
         data = pad(data)
-    
-    sr = iv
-    result = b''
-    
-    for i in range(0, len(data), BLOCK_SIZE):
-        block = data[i:i+BLOCK_SIZE]
-        encrypted_sr = vigenere(sr, True)
-        processed = []
-        for j in range(len(block)):
-            b = block[j]
-            e = encrypted_sr[j]
-            xor_result = b ^ e
-            processed.append(xor_result)
-        processed = bytes(processed)
-        result += processed
-        sr = processed if encrypt else block
-    
-    return unpad(result) if not encrypt else result
+        # Criptografia: processa da esquerda para direita
+        sr = iv  # Shift Register inicia com IV
+        result = b''
+        
+        for i in range(0, len(data), BLOCK_SIZE):
+            block = data[i:i+BLOCK_SIZE]
+            encrypted_sr = vigenere(sr, True)  # Criptografa SR com Vigenère
+            processed = []
+            for j in range(len(block)):
+                b = block[j]
+                e = encrypted_sr[j]
+                xor_result = b ^ e  # XOR entre plaintext e SR criptografado
+                processed.append(xor_result)
+            processed = bytes(processed)
+            result += processed
+            sr = processed  # SR = resultado da operação XOR
+        
+        return result
+    else:
+        # Descriptografia: processa da esquerda para direita (ordem normal)
+        sr = iv  # Shift Register inicia com IV
+        result = b''
+        
+        for i in range(0, len(data), BLOCK_SIZE):
+            block = data[i:i+BLOCK_SIZE]
+            encrypted_sr = vigenere(sr, True)  # Criptografa SR com Vigenère
+            processed = []
+            for j in range(len(block)):
+                b = block[j]
+                e = encrypted_sr[j]
+                xor_result = b ^ e  # XOR entre ciphertext e SR criptografado
+                processed.append(xor_result)
+            processed = bytes(processed)
+            result += processed
+            sr = block  # SR = bloco do ciphertext original
+        
+        return unpad(result)
 
 def header(mode: str, iv: bytes = None) -> bytes:
-    magic = b"VIGB"
-    version = bytes([1])
+    """
+    Cria header do arquivo cifrado:
+    - Magic: "VIGB" (4 bytes)
+    - Version: 1 (1 byte)
+    - Mode: ECB/CFB (3 bytes, padded)
+    - Block size: tamanho do bloco (1 byte)
+    - IV: vetor de inicialização (se CFB)
+    - Length: tamanho dos dados (4 bytes)
+    """
+    magic = b"VIGB"  # Identificador do formato
+    version = bytes([1])  # Versão do formato
     mode_bytes = mode.encode("ascii")
-    mode_padded = mode_bytes.ljust(3, b'\x00')
+    mode_padded = mode_bytes.ljust(3, b'\x00')  # Padding para 3 bytes
     block_size_bytes = bytes([BLOCK_SIZE])
     
     h = magic + version + mode_padded + block_size_bytes
     
-    if iv:
+    if iv:  # Adiciona IV se modo CFB
         h = h + iv
     
-    length_bytes = struct.pack(">I", 1)
+    length_bytes = struct.pack(">I", 1)  # Tamanho dos dados (big-endian)
     h = h + length_bytes
     
     return h
@@ -224,40 +271,66 @@ def passo_a_passo_cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
     print(f"\n=== PROCESSAMENTO CFB ===")
     print(f"Dados para processar: {padded_data.hex(' ')} ({len(padded_data)} bytes)")
     
-    sr = iv
-    result = b''
-    
-    for i in range(0, len(padded_data), BLOCK_SIZE):
-        block = padded_data[i:i+BLOCK_SIZE]
-        print(f"\n--- Iteração {i//BLOCK_SIZE + 1} ---")
-        print(f"Bloco atual: {block.hex(' ')}")
-        print(f"Shift Register (SR): {sr.hex(' ')}")
+    if encrypt:
+        print(f"NOTA: CFB criptografia processa da esquerda para direita")
+        print(f"SR atualiza com resultado XOR a cada iteração")
         
-        # Criptografar SR
-        print(f"\n1. Criptografando SR com Vigenère:")
-        encrypted_sr = passo_a_passo_vigenere(sr, True)
+        sr = iv
+        result = b''
         
-        # XOR
-        print(f"\n2. Operação XOR:")
-        processed = []
-        for j in range(len(block)):
-            b = block[j]
-            e = encrypted_sr[j]
-            xor_result = b ^ e
-            print(f"   Byte {j}: {b:3d} ^ {e:3d} = {xor_result:3d}")
-            processed.append(xor_result)
-        processed = bytes(processed)
-        print(f"   Resultado XOR: {processed.hex(' ')}")
-        
-        result += processed
-        
-        # Atualizar SR
-        if encrypt:
+        for i in range(0, len(padded_data), BLOCK_SIZE):
+            block = padded_data[i:i+BLOCK_SIZE]
+            print(f"\n--- Iteração {i//BLOCK_SIZE + 1} ---")
+            print(f"Bloco atual: {block.hex(' ')}")
+            print(f"Shift Register (SR): {sr.hex(' ')}")
+            
+            print(f"\n1. Criptografando SR com Vigenère:")
+            encrypted_sr = passo_a_passo_vigenere(sr, True)
+            
+            print(f"\n2. Operação XOR:")
+            processed = []
+            for j in range(len(block)):
+                b = block[j]
+                e = encrypted_sr[j]
+                xor_result = b ^ e
+                print(f"   Byte {j}: {b:3d} ^ {e:3d} = {xor_result:3d}")
+                processed.append(xor_result)
+            processed = bytes(processed)
+            print(f"   Resultado XOR: {processed.hex(' ')}")
+            
+            result += processed
             sr = processed
-            print(f"3. Novo SR (para próxima iteração): {sr.hex(' ')}")
-        else:
+            print(f"3. Novo SR (resultado XOR): {sr.hex(' ')}")
+    else:
+        print(f"NOTA: CFB descriptografia processa da esquerda para direita")
+        print(f"SR atualiza com bloco ciphertext a cada iteração")
+        
+        sr = iv
+        result = b''
+        
+        for i in range(0, len(padded_data), BLOCK_SIZE):
+            block = padded_data[i:i+BLOCK_SIZE]
+            print(f"\n--- Iteração {i//BLOCK_SIZE + 1} ---")
+            print(f"Bloco atual: {block.hex(' ')}")
+            print(f"Shift Register (SR): {sr.hex(' ')}")
+            
+            print(f"\n1. Criptografando SR com Vigenère:")
+            encrypted_sr = passo_a_passo_vigenere(sr, True)
+            
+            print(f"\n2. Operação XOR:")
+            processed = []
+            for j in range(len(block)):
+                b = block[j]
+                e = encrypted_sr[j]
+                xor_result = b ^ e
+                print(f"   Byte {j}: {b:3d} ^ {e:3d} = {xor_result:3d}")
+                processed.append(xor_result)
+            processed = bytes(processed)
+            print(f"   Resultado XOR: {processed.hex(' ')}")
+            
+            result += processed
             sr = block
-            print(f"3. Novo SR (para próxima iteração): {sr.hex(' ')}")
+            print(f"3. Novo SR (bloco ciphertext): {sr.hex(' ')}")
     
     if encrypt:
         print(f"\n=== RESULTADO FINAL CFB ===")
