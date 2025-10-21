@@ -1,3 +1,6 @@
+#Nomes:
+#Guilherme Roldão dos Reis Pimenta - 202435001
+
 import struct
 
 BLOCK_SIZE = 5
