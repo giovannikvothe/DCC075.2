@@ -8,10 +8,12 @@ for char in key_string:
     KEY_BYTES.append(byte_value)
 
 def pad(data: bytes) -> bytes:
+    # Sempre cria um bloco de padding, com cada byte informando quantos bytes de padding foram criados.
     pad_len = BLOCK_SIZE - (len(data) % BLOCK_SIZE)
     return data + bytes([pad_len] * pad_len)
 
 def unpad(data: bytes) -> bytes:
+    # Le o ultimo byte (sempre criado pelo pad()) para obter o tamanho do padding e retorna os dados sem o padding.
     return data[:-data[-1]]
 
 def vigenere(block: bytes, encrypt: bool = True) -> bytes:
@@ -31,16 +33,20 @@ def vigenere(block: bytes, encrypt: bool = True) -> bytes:
 
 def ecb(data: bytes, encrypt: bool = True) -> bytes:
     if encrypt:
+        # Criptografia
         data = pad(data)
         
         result = b''
         for i in range(0, len(data), BLOCK_SIZE):
+            # Aplica vigenere no bloco e concatena ao resultado
             block = data[i:i+BLOCK_SIZE]
             encrypted_block = vigenere(block, True)
             result = result + encrypted_block
     else:
+        # Descriptografia
         result = b''
         for i in range(0, len(data), BLOCK_SIZE):
+            # Aplica a descriptografia de vigenere no bloco e concatena ao resultado
             block = data[i:i+BLOCK_SIZE]
             decrypted_block = vigenere(block, False)
             result = result + decrypted_block
@@ -268,7 +274,7 @@ if __name__ == "__main__":
     plaintext = b"CRIPTOGRAFIA"
     iv = b"INIT!"
 
-    print(f"Chave: 035AC (bytes: {KEY_BYTES})")
+    print(f"Chave: {key_string} (bytes: {KEY_BYTES})")
     print(f"Texto original: {plaintext.decode()}")
 
     # Modo ECB
