@@ -76,7 +76,6 @@ def cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
     Modo CFB (Cipher Feedback) - usa feedback do ciphertext para criptografar próximo bloco
     """
     if encrypt:
-        data = pad(data)
         # Criptografia: processa da esquerda para direita
         sr = iv  # Shift Register inicia com IV
         result = b''
@@ -113,7 +112,7 @@ def cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
             result += processed
             sr = block  # SR = bloco do ciphertext original
         
-        return unpad(result)
+        return result
 
 def header(mode: str, iv: bytes = None) -> bytes:
     """
@@ -259,17 +258,14 @@ def passo_a_passo_cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
         print(f"Texto em bytes: {data.hex(' ')}")
         print(f"IV: {iv.decode()} ({iv.hex(' ')})")
         
-        # Passo 1: Padding
-        padded_data = passo_a_passo_padding(data, "ADICIONAR")
         
     else:
         print(f"Ciphertext: {data.hex(' ')}")
         print(f"IV: {iv.decode()} ({iv.hex(' ')})")
-        padded_data = data
     
-    # Passo 2: Processamento CFB
+    # Passo 1: Processamento CFB
     print(f"\n=== PROCESSAMENTO CFB ===")
-    print(f"Dados para processar: {padded_data.hex(' ')} ({len(padded_data)} bytes)")
+    print(f"Dados para processar: {data.hex(' ')} ({len(data)} bytes)")
     
     if encrypt:
         print(f"NOTA: CFB criptografia processa da esquerda para direita")
@@ -278,8 +274,8 @@ def passo_a_passo_cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
         sr = iv
         result = b''
         
-        for i in range(0, len(padded_data), BLOCK_SIZE):
-            block = padded_data[i:i+BLOCK_SIZE]
+        for i in range(0, len(data), BLOCK_SIZE):
+            block = data[i:i+BLOCK_SIZE]
             print(f"\n--- Iteração {i//BLOCK_SIZE + 1} ---")
             print(f"Bloco atual: {block.hex(' ')}")
             print(f"Shift Register (SR): {sr.hex(' ')}")
@@ -308,8 +304,8 @@ def passo_a_passo_cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
         sr = iv
         result = b''
         
-        for i in range(0, len(padded_data), BLOCK_SIZE):
-            block = padded_data[i:i+BLOCK_SIZE]
+        for i in range(0, len(data), BLOCK_SIZE):
+            block = data[i:i+BLOCK_SIZE]
             print(f"\n--- Iteração {i//BLOCK_SIZE + 1} ---")
             print(f"Bloco atual: {block.hex(' ')}")
             print(f"Shift Register (SR): {sr.hex(' ')}")
@@ -337,11 +333,10 @@ def passo_a_passo_cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
         print(f"Ciphertext completo: {result.hex(' ')}")
         return result
     else:
-        # Remover padding
-        unpadded_result = passo_a_passo_padding(result, "REMOVER")
+
         print(f"\n=== RESULTADO FINAL CFB ===")
-        print(f"Texto descriptografado: {unpadded_result.decode()}")
-        return unpadded_result
+        print(f"Texto descriptografado: {result.decode()}")
+        return result
 
 if __name__ == "__main__":
     plaintext = b"CRIPTOGRAFIA"
