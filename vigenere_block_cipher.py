@@ -114,7 +114,7 @@ def cfb(data: bytes, iv: bytes, encrypt: bool = True) -> bytes:
         
         return result
 
-def header(mode: str, iv: bytes = None) -> bytes:
+def header(mode: str, plaintext: bytes, iv: bytes = None) -> bytes:
     """
     Cria header do arquivo cifrado:
     - Magic: "VIGB" (4 bytes)
@@ -135,7 +135,8 @@ def header(mode: str, iv: bytes = None) -> bytes:
     if iv:  # Adiciona IV se modo CFB
         h = h + iv
     
-    length_bytes = struct.pack(">I", 1)  # Tamanho dos dados (big-endian)
+    length = len(plaintext)
+    length_bytes = struct.pack(">I", length)
     h = h + length_bytes
     
     return h
@@ -350,7 +351,7 @@ if __name__ == "__main__":
     p_ecb = ecb(c_ecb, False)
     print(f"\n[ECB] Ciphertext: {c_ecb.hex(' ')}")
     print(f"[ECB] Decrypted: {p_ecb.decode()}")
-    print(f"[ECB] Header: {header('ECB').hex(' ')}")
+    print(f"[ECB] Header: {header('ECB', plaintext).hex(' ')}")
 
     # Modo CFB
     c_cfb = cfb(plaintext, iv, True)
@@ -358,7 +359,7 @@ if __name__ == "__main__":
     print(f"\n[CFB] IV: {iv.decode()}")
     print(f"[CFB] Ciphertext: {c_cfb.hex(' ')}")
     print(f"[CFB] Decrypted: {p_cfb.decode()}")
-    print(f"[CFB] Header: {header('CFB', iv).hex(' ')}")
+    print(f"[CFB] Header: {header('CFB', plaintext, iv).hex(' ')}")
     
     print(f"\n{'='*80}")
     print("EXECUTANDO PASSO A PASSO DETALHADO")
