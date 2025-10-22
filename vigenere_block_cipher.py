@@ -1,5 +1,6 @@
 #Nomes:
 #Guilherme Roldão dos Reis Pimenta - 202435001
+#Giovanni Almeida Dutra - 202465035AC
 
 import struct
 
